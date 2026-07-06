@@ -128,50 +128,59 @@
 	let daysLeft = $state(0);
 	const examDate = new Date('2026-07-26'); // Exam target date for simulation
 
-	onMount(async () => {
+	let hasLoaded = false;
+
+	$effect(() => {
+		if (user.uid && !hasLoaded) {
+			hasLoaded = true;
+			loadDashboardData();
+		}
+	});
+
+	async function loadDashboardData() {
+		// Handle Mock Stripe Success
+		if (page.url.searchParams.get('stripe_mock_success') === 'true') {
+			const userRef = doc(db, `users/${user.uid}`);
+			await updateDoc(userRef, { planStatus: 'premium_active' });
+			// Update store
+			userStore.update((store) => ({ ...store, planStatus: 'premium_active' }));
+			user.planStatus = 'premium_active';
+		}
+
+		try {
+			// Load user goal
+			const userGoalSnap = await getDoc(
+				doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
+			);
+			if (userGoalSnap.exists()) {
+				userGoal = userGoalSnap.data() as UserGoal;
+			}
+
+			// Load goal weights
+			const goalSnap = await getDoc(doc(db, 'goals/1kyu_kenchikushi'));
+			if (goalSnap.exists()) {
+				goalInfo = goalSnap.data() as Goal;
+			}
+
+			// Load daily columns
+			const columnsSnap = await getDocs(collection(db, 'goals/1kyu_kenchikushi/daily_columns'));
+			const tempCols: DailyColumn[] = [];
+			columnsSnap.forEach((doc) => {
+				tempCols.push({ columnId: doc.id, ...doc.data() } as DailyColumn);
+			});
+			dailyColumns = tempCols;
+		} catch (e) {
+			console.error('Error loading dashboard data:', e);
+		} finally {
+			loadingData = false;
+		}
+	}
+
+	onMount(() => {
 		// Calculate countdown
 		const today = new Date();
 		const diffTime = examDate.getTime() - today.getTime();
 		daysLeft = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-
-		if (user.uid) {
-			// Handle Mock Stripe Success
-			if (page.url.searchParams.get('stripe_mock_success') === 'true') {
-				const userRef = doc(db, `users/${user.uid}`);
-				await updateDoc(userRef, { planStatus: 'premium_active' });
-				// Update store
-				userStore.update((store) => ({ ...store, planStatus: 'premium_active' }));
-				user.planStatus = 'premium_active';
-			}
-
-			try {
-				// Load user goal
-				const userGoalSnap = await getDoc(
-					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
-				);
-				if (userGoalSnap.exists()) {
-					userGoal = userGoalSnap.data() as UserGoal;
-				}
-
-				// Load goal weights
-				const goalSnap = await getDoc(doc(db, 'goals/1kyu_kenchikushi'));
-				if (goalSnap.exists()) {
-					goalInfo = goalSnap.data() as Goal;
-				}
-
-				// Load daily columns
-				const columnsSnap = await getDocs(collection(db, 'goals/1kyu_kenchikushi/daily_columns'));
-				const tempCols: DailyColumn[] = [];
-				columnsSnap.forEach((doc) => {
-					tempCols.push({ columnId: doc.id, ...doc.data() } as DailyColumn);
-				});
-				dailyColumns = tempCols;
-			} catch (e) {
-				console.error('Error loading dashboard data:', e);
-			} finally {
-				loadingData = false;
-			}
-		}
 	});
 
 	// Trigger checkout via Stripe local API

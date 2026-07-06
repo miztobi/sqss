@@ -22,27 +22,34 @@
 		user = val as any;
 	});
 
-	onMount(async () => {
-		if (user.uid) {
-			try {
-				const userGoalSnap = await getDoc(
-					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
-				);
-				if (userGoalSnap.exists()) {
-					userGoal = userGoalSnap.data() as UserGoal;
-					intensity = userGoal.intensityPreference;
-					targetGoalId = userGoal.goalId;
-					morningTime = userGoal.morningNotificationTime || '07:00';
-					afternoonTime = userGoal.afternoonNotificationTime || '12:00';
-					questionCount = userGoal.questionCountPerSession || 10;
-				}
-			} catch (e) {
-				console.error(e);
-			} finally {
-				loadingData = false;
-			}
+	let hasLoaded = false;
+
+	$effect(() => {
+		if (user.uid && !hasLoaded) {
+			hasLoaded = true;
+			loadSettingsData();
 		}
 	});
+
+	async function loadSettingsData() {
+		try {
+			const userGoalSnap = await getDoc(
+				doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
+			);
+			if (userGoalSnap.exists()) {
+				userGoal = userGoalSnap.data() as UserGoal;
+				intensity = userGoal.intensityPreference;
+				targetGoalId = userGoal.goalId;
+				morningTime = userGoal.morningNotificationTime || '07:00';
+				afternoonTime = userGoal.afternoonNotificationTime || '12:00';
+				questionCount = userGoal.questionCountPerSession || 10;
+			}
+		} catch (e) {
+			console.error(e);
+		} finally {
+			loadingData = false;
+		}
+	}
 
 	async function handleSaveSettings() {
 		if (!user.uid || !userGoal) return;

@@ -29,36 +29,43 @@
 		{ weeks: '第21週 〜 第24週', subject: '総演習・弱点特訓', focus: '各年度本試験過去問の制限時間内シミュレーション、新法改正・時事コラムの総点検' }
 	];
 
-	onMount(async () => {
-		if (user.uid) {
-			try {
-				const userGoalSnap = await getDoc(
-					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
-				);
-				if (userGoalSnap.exists()) {
-					const data = userGoalSnap.data() as any;
-					if (!data.targetYear) {
-						data.targetYear = 2026; // Default goal target
-					}
-					userGoal = data;
-				}
+	let hasLoaded = false;
 
-				// Load tag matrix for catching up on mastery
-				const tagMatrixSnap = await getDocs(
-					collection(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/tagMatrix`)
-				);
-				const tempTags: TagMatrix[] = [];
-				tagMatrixSnap.forEach((doc) => {
-					tempTags.push({ tagName: doc.id, ...doc.data() } as TagMatrix);
-				});
-				tagMatrixList = tempTags;
-			} catch (e) {
-				console.error(e);
-			} finally {
-				loadingData = false;
-			}
+	$effect(() => {
+		if (user.uid && !hasLoaded) {
+			hasLoaded = true;
+			loadCurriculumData();
 		}
 	});
+
+	async function loadCurriculumData() {
+		try {
+			const userGoalSnap = await getDoc(
+				doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
+			);
+			if (userGoalSnap.exists()) {
+				const data = userGoalSnap.data() as any;
+				if (!data.targetYear) {
+					data.targetYear = 2026; // Default goal target
+				}
+				userGoal = data;
+			}
+
+			// Load tag matrix for catching up on mastery
+			const tagMatrixSnap = await getDocs(
+				collection(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/tagMatrix`)
+			);
+			const tempTags: TagMatrix[] = [];
+			tagMatrixSnap.forEach((doc) => {
+				tempTags.push({ tagName: doc.id, ...doc.data() } as TagMatrix);
+			});
+			tagMatrixList = tempTags;
+		} catch (e) {
+			console.error(e);
+		} finally {
+			loadingData = false;
+		}
+	}
 
 	async function saveGoalSettings() {
 		if (!user.uid || !userGoal) return;

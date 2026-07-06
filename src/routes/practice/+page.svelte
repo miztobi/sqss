@@ -29,7 +29,71 @@
 		user = val as any;
 	});
 
-	onMount(async () => {
+	let hasLoaded = false;
+
+	$effect(() => {
+		if (user.uid && !hasLoaded) {
+			hasLoaded = true;
+			loadPracticeData();
+		}
+	});
+
+	async function loadPracticeData() {
+		try {
+			// Load user goal to get custom question count per session
+			let limitCount = 10;
+			const userGoalSnap = await getDoc(
+				doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
+			);
+			if (userGoalSnap.exists()) {
+				const data = userGoalSnap.data();
+				limitCount = data.questionCountPerSession || 10;
+			}
+
+			// Load past questions from Firestore
+			const questionsSnap = await getDocs(
+				collection(db, 'goals/1kyu_kenchikushi/past_questions')
+			);
+			const tempQuestions: Question[] = [];
+			questionsSnap.forEach((doc) => {
+				tempQuestions.push({ questionId: doc.id, ...doc.data() } as Question);
+			});
+
+			// Slice to preferred questions count
+			questions = tempQuestions.slice(0, limitCount);
+
+			// Load question notes
+			for (const q of questions) {
+				const noteSnap = await getDoc(
+					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/questionLogs/${q.questionId}`)
+				);
+				if (noteSnap.exists()) {
+					notes[q.questionId] = noteSnap.data().note || '';
+				}
+			}
+
+			// Load saved session if exists
+			const savedSession = localStorage.getItem('sqss_practice_session');
+			if (savedSession) {
+				const session = JSON.parse(savedSession);
+				// Verify it matches the current user and question set
+				if (session.userId === user.uid && session.questionsHash === getQuestionsHash(questions)) {
+					if (confirm('前回の未完了セッションがあります。再開しますか？')) {
+						currentIndex = session.currentIndex;
+						answers = session.answers;
+					} else {
+						localStorage.removeItem('sqss_practice_session');
+					}
+				}
+			}
+		} catch (e) {
+			console.error('Error fetching questions:', e);
+		} finally {
+			loadingData = false;
+		}
+	}
+
+	onMount(() => {
 		// Determine session type based on current time or URL parameter
 		const param = page.url.searchParams.get('session');
 		if (param === 'morning' || param === 'evening' || param === 'afternoon') {
@@ -37,60 +101,6 @@
 		} else {
 			const hour = new Date().getHours();
 			sessionType = hour < 12 ? 'morning' : 'evening';
-		}
-		if (user.uid) {
-			try {
-				// Load user goal to get custom question count per session
-				let limitCount = 10;
-				const userGoalSnap = await getDoc(
-					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
-				);
-				if (userGoalSnap.exists()) {
-					const data = userGoalSnap.data();
-					limitCount = data.questionCountPerSession || 10;
-				}
-
-				// Load past questions from Firestore
-				const questionsSnap = await getDocs(
-					collection(db, 'goals/1kyu_kenchikushi/past_questions')
-				);
-				const tempQuestions: Question[] = [];
-				questionsSnap.forEach((doc) => {
-					tempQuestions.push({ questionId: doc.id, ...doc.data() } as Question);
-				});
-
-				// Slice to preferred questions count
-				questions = tempQuestions.slice(0, limitCount);
-
-				// Load question notes
-				for (const q of questions) {
-					const noteSnap = await getDoc(
-						doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/questionLogs/${q.questionId}`)
-					);
-					if (noteSnap.exists()) {
-						notes[q.questionId] = noteSnap.data().note || '';
-					}
-				}
-
-				// Load saved session if exists
-				const savedSession = localStorage.getItem('sqss_practice_session');
-				if (savedSession) {
-					const session = JSON.parse(savedSession);
-					// Verify it matches the current user and question set
-					if (session.userId === user.uid && session.questionsHash === getQuestionsHash(questions)) {
-						if (confirm('前回の未完了セッションがあります。再開しますか？')) {
-							currentIndex = session.currentIndex;
-							answers = session.answers;
-						} else {
-							localStorage.removeItem('sqss_practice_session');
-						}
-					}
-				}
-			} catch (e) {
-				console.error('Error fetching questions:', e);
-			} finally {
-				loadingData = false;
-			}
 		}
 	});
 

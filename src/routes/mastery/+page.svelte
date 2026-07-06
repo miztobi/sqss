@@ -22,39 +22,46 @@
 		user = val as any;
 	});
 
-	onMount(async () => {
-		if (user.uid) {
-			try {
-				// Load user goal
-				const userGoalSnap = await getDoc(
-					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
-				);
-				if (userGoalSnap.exists()) {
-					userGoal = userGoalSnap.data() as UserGoal;
-				}
+	let hasLoaded = false;
 
-				// Load goal weights
-				const goalSnap = await getDoc(doc(db, 'goals/1kyu_kenchikushi'));
-				if (goalSnap.exists()) {
-					goalInfo = goalSnap.data() as Goal;
-				}
-
-				// Load user's tag matrix
-				const tagMatrixSnap = await getDocs(
-					collection(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/tagMatrix`)
-				);
-				const tempTags: TagMatrix[] = [];
-				tagMatrixSnap.forEach((doc) => {
-					tempTags.push({ tagName: doc.id, ...doc.data() } as TagMatrix);
-				});
-				tagMatrixList = tempTags;
-			} catch (e) {
-				console.error(e);
-			} finally {
-				loadingData = false;
-			}
+	$effect(() => {
+		if (user.uid && !hasLoaded) {
+			hasLoaded = true;
+			loadMasteryData();
 		}
 	});
+
+	async function loadMasteryData() {
+		try {
+			// Load user goal
+			const userGoalSnap = await getDoc(
+				doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
+			);
+			if (userGoalSnap.exists()) {
+				userGoal = userGoalSnap.data() as UserGoal;
+			}
+
+			// Load goal weights
+			const goalSnap = await getDoc(doc(db, 'goals/1kyu_kenchikushi'));
+			if (goalSnap.exists()) {
+				goalInfo = goalSnap.data() as Goal;
+			}
+
+			// Load user's tag matrix
+			const tagMatrixSnap = await getDocs(
+				collection(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/tagMatrix`)
+			);
+			const tempTags: TagMatrix[] = [];
+			tagMatrixSnap.forEach((doc) => {
+				tempTags.push({ tagName: doc.id, ...doc.data() } as TagMatrix);
+			});
+			tagMatrixList = tempTags;
+		} catch (e) {
+			console.error(e);
+		} finally {
+			loadingData = false;
+		}
+	}
 
 	async function updateLoopMode(loop: number) {
 		if (!user.uid || !userGoal) return;
