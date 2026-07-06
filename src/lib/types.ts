@@ -14,6 +14,9 @@ export interface UserGoal {
 	estimatedScore: number;
 	intensityPreference: number; // 毎晩の勉強強度（15, 30, 60分）
 	status: 'on_track' | 'behind';
+	lastSessionDate?: string;
+	morningCompleted?: boolean;
+	afternoonCompleted?: boolean;
 }
 
 export interface TagStats {
