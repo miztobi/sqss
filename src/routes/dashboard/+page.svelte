@@ -214,19 +214,22 @@
 				</p>
 			</a>
 
-			<!-- 3. Countdown & Target Info -->
+			<!-- 3. Countdown & Target Info -> Leads to Curriculum Page -->
 			<div
 				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col justify-between"
 			>
-				<div>
-					<h3 class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-4">
-						学科試験カウントダウン
+				<a
+					href="/curriculum"
+					class="block group focus:outline-none text-left"
+				>
+					<h3 class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-4 group-hover:text-brass transition-colors">
+						学科試験カウントダウン（計画詳細へ）
 					</h3>
 					<div class="flex items-baseline space-x-2">
-						<span class="text-5xl font-serif font-black text-brass">{daysLeft}</span>
+						<span class="text-5xl font-serif font-black text-brass transition-transform group-hover:scale-105 origin-left inline-block">{daysLeft}</span>
 						<span class="text-sm font-light text-gray-400">日後 (2026/07/26)</span>
 					</div>
-				</div>
+				</a>
 
 				<button
 					onclick={openProgressDialog}

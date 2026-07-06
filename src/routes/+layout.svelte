@@ -156,10 +156,10 @@
 								: ''}">過去問演習</a
 						>
 						<a
-							href="/special-training"
-							class="hover:text-brass transition-colors {page.url.pathname === '/special-training'
+							href="/curriculum"
+							class="hover:text-brass transition-colors {page.url.pathname === '/curriculum'
 								? 'text-brass font-normal border-b border-brass pb-1'
-								: ''}">AI処方特訓</a
+								: ''}">カリキュラム</a
 						>
 						<a
 							href="/mastery"
