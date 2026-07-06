@@ -190,6 +190,7 @@
 					{#each loopModes as mode}
 						<button
 							onclick={() => {
+								if (!userGoal) return;
 								userGoal.currentLoop = mode.value;
 								saveGoalSettings();
 							}}
