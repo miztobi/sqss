@@ -12,6 +12,7 @@
 
 	let isDarkMode = $state(true); // Default to Dark mode (premium architectural theme)
 	let user = $state({ uid: null, email: null, loading: true });
+	let showUserMenu = $state(false);
 
 	// Subscribe to store
 	userStore.subscribe((val) => {
@@ -172,12 +173,6 @@
 								? 'text-brass font-normal border-b border-brass pb-1'
 								: ''}">学習ログ</a
 						>
-						<a
-							href="/settings"
-							class="hover:text-brass transition-colors {page.url.pathname === '/settings'
-								? 'text-brass font-normal border-b border-brass pb-1'
-								: ''}">設定</a
-						>
 					</nav>
 				{/if}
 
@@ -227,18 +222,115 @@
 					{#if !user.loading}
 						{#if user.uid}
 							<div
-								class="flex items-center space-x-3 text-sm border-l border-gray-200 dark:border-gray-800 pl-4"
+								class="relative flex items-center border-l border-gray-200 dark:border-gray-800 pl-4"
 							>
-								<span
-									class="hidden lg:inline text-gray-500 dark:text-gray-400 font-light truncate max-w-[150px]"
-									>{user.email}</span
-								>
+								<!-- Dropdown Toggle Button -->
 								<button
-									onclick={handleLogout}
-									class="px-3 py-1.5 border border-gray-200 dark:border-gray-800 hover:border-red-500 hover:text-red-500 text-xs rounded transition-all duration-300 font-light"
+									onclick={() => (showUserMenu = !showUserMenu)}
+									class="flex items-center space-x-1.5 focus:outline-none hover:text-brass transition-colors text-xs font-light cursor-pointer py-1"
 								>
-									サインアウト
+									<span class="truncate max-w-[120px]">{user.email}</span>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-3 w-3 transition-transform duration-300 {showUserMenu ? 'rotate-180' : ''}"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+									</svg>
 								</button>
+
+								<!-- Dropdown Menu Box -->
+								{#if showUserMenu}
+									<!-- Overlay close detector -->
+									<!-- svelte-ignore a11y_click_events_have_key_events -->
+									<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<div class="fixed inset-0 z-10" onclick={() => (showUserMenu = false)}></div>
+
+									<div
+										class="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 rounded shadow-xl py-2 z-20 text-left transition-all duration-300"
+									>
+										<!-- Accounts (Stripe Plan, Course) -->
+										<a
+											href="/settings"
+											onclick={() => (showUserMenu = false)}
+											class="flex items-center px-4 py-2 text-xs text-text-light dark:text-text-dark hover:bg-gray-50 dark:hover:bg-black/20 hover:text-brass transition-colors"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-3.5 w-3.5 mr-2"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+												/>
+											</svg>
+											<span>アカウントコース</span>
+										</a>
+
+										<!-- Settings -->
+										<a
+											href="/settings"
+											onclick={() => (showUserMenu = false)}
+											class="flex items-center px-4 py-2 text-xs text-text-light dark:text-text-dark hover:bg-gray-50 dark:hover:bg-black/20 hover:text-brass transition-colors"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-3.5 w-3.5 mr-2"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+												/>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+												/>
+											</svg>
+											<span>学習設定</span>
+										</a>
+
+										<div class="border-t border-gray-100 dark:border-gray-800 my-1"></div>
+
+										<!-- Sign Out -->
+										<button
+											onclick={() => {
+												showUserMenu = false;
+												handleLogout();
+											}}
+											class="flex items-center w-full text-left px-4 py-2 text-xs text-rose-500 hover:bg-rose-500/5 transition-colors cursor-pointer"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-3.5 w-3.5 mr-2"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													stroke-width="2"
+													d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+												/>
+											</svg>
+											<span>サインアウト</span>
+										</button>
+									</div>
+								{/if}
 							</div>
 						{/if}
 					{/if}

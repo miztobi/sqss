@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/store';
 	import { db } from '$lib/firebase';
-	import { doc, getDoc, updateDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+	import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 	import { page } from '$app/state';
 	import type { UserGoal, Goal, TagMatrix, DailyColumn } from '$lib/types';
 
@@ -12,6 +12,7 @@
 	import TagChip from '$lib/components/molecules/TagChip.svelte';
 	import Progress from '$lib/components/atoms/Progress.svelte';
 	import Button from '$lib/components/atoms/Button.svelte';
+	import Badge from '$lib/components/atoms/Badge.svelte';
 	import DailyColumnCard from '$lib/components/organisms/DailyColumnCard.svelte';
 	import Modal from '$lib/components/organisms/Modal.svelte';
 	import ReviewItem from '$lib/components/organisms/ReviewItem.svelte';
@@ -22,14 +23,6 @@
 	let tagMatrixList = $state<TagMatrix[]>([]);
 	let dailyColumns = $state<DailyColumn[]>([]);
 
-	// Pick one column daily
-	let todayColumn = $derived.by(() => {
-		if (dailyColumns.length === 0) return null;
-		const day = new Date().getDate();
-		const index = day % dailyColumns.length;
-		return dailyColumns[index];
-	});
-
 	let loadingData = $state(true);
 	let billingRedirecting = $state(false);
 
@@ -38,6 +31,10 @@
 	let progressLogs = $state<any[]>([]);
 	let loadingProgressLogs = $state(false);
 	let editingNotes = $state<Record<string, string>>({});
+
+	// Column Detail Dialog States
+	let showColumnDialog = $state(false);
+	let selectedColumn = $state<any>(null);
 
 	userStore.subscribe((val) => {
 		user = val as any;
@@ -165,6 +162,14 @@
 			billingRedirecting = false;
 		}
 	}
+
+	// Pick one column daily
+	let todayColumn = $derived.by(() => {
+		if (dailyColumns.length === 0) return null;
+		const day = new Date().getDate();
+		const index = day % dailyColumns.length;
+		return dailyColumns[index];
+	});
 </script>
 
 <div class="max-w-6xl mx-auto px-6 py-12 flex-grow flex flex-col space-y-12">
@@ -175,12 +180,15 @@
 	{:else}
 		<!-- TOP OVERVIEW SECTION -->
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-			<!-- 1. Estimated Score Meter -->
-			<div
-				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col items-center justify-center text-center relative group"
+			<!-- 1. Estimated Score Meter -> Leads to Mastery Page -->
+			<a
+				href="/mastery"
+				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col items-center justify-center text-center relative group hover:border-brass/60 transition-colors duration-300"
 			>
-				<h3 class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-4">
-					想定本試験得点
+				<h3
+					class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-4 group-hover:text-brass transition-colors"
+				>
+					想定本試験得点（習得度詳細へ）
 				</h3>
 				<Meter score={userGoal?.estimatedScore || 0} />
 				<p class="text-xs font-light text-gray-400 mt-4">
@@ -188,20 +196,23 @@
 						? '+'
 						: '') + ((userGoal?.estimatedScore || 0) - 90)}
 				</p>
-			</div>
+			</a>
 
-			<!-- 2. Bell Curve / Rival Graph -->
-			<div
-				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col justify-between"
+			<!-- 2. Bell Curve / Rival Graph -> Leads to Mastery Page -->
+			<a
+				href="/mastery"
+				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col justify-between group hover:border-brass/60 transition-colors duration-300"
 			>
-				<h3 class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-2 text-center">
-					全国ライバル比較 (想定点分布)
+				<h3
+					class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-2 text-center group-hover:text-brass transition-colors"
+				>
+					全国ライバル比較（習得度詳細へ）
 				</h3>
 				<RivalGraph score={userGoal?.estimatedScore || 0} />
 				<p class="text-xs font-light text-center text-gray-400 mt-2">
 					あなたは現在、上位約 <span class="text-brass font-bold">42%</span> に位置しています。
 				</p>
-			</div>
+			</a>
 
 			<!-- 3. Countdown & Target Info -->
 			<div
@@ -335,7 +346,13 @@
 
 			<div class="w-full max-w-2xl">
 				{#if todayColumn}
-					<DailyColumnCard column={todayColumn} />
+					<DailyColumnCard
+						column={todayColumn}
+						onclick={() => {
+							selectedColumn = todayColumn;
+							showColumnDialog = true;
+						}}
+					/>
 				{:else}
 					<p class="text-xs font-light text-gray-400">今日のコラムはありません。</p>
 				{/if}
@@ -373,6 +390,59 @@
 							/>
 						</div>
 					{/each}
+				</div>
+			{/if}
+		</Modal>
+
+		<!-- Column detail dialog (modal) -->
+		<Modal bind:show={showColumnDialog} title={selectedColumn?.title || 'コラム詳細'}>
+			{#if selectedColumn}
+				<div class="space-y-4 text-left">
+					<div class="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+						<Badge text={selectedColumn.category} variant="subject" />
+						{#if selectedColumn.relatedTags}
+							<div class="flex gap-1.5">
+								{#each selectedColumn.relatedTags as tag}
+									<span
+										class="text-[9px] font-light bg-gray-100 dark:bg-black/30 border border-gray-200 dark:border-gray-800 text-gray-500 px-2 py-0.5 rounded"
+									>
+										#{tag}
+									</span>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<p
+						class="text-xs font-serif font-light text-text-light dark:text-text-dark leading-relaxed whitespace-pre-wrap"
+					>
+						{selectedColumn.content}
+					</p>
+
+					<!-- Image search URL helper -->
+					<div class="pt-4 border-t border-gray-100 dark:border-gray-800/40">
+						<a
+							href="https://www.google.com/search?tbm=isch&q={encodeURIComponent(selectedColumn.title)}"
+							target="_blank"
+							class="text-[10px] tracking-widest font-bold text-brass-dark dark:text-brass-light hover:text-brass flex items-center space-x-1 w-max"
+						>
+							<span>ビジュアル脳内定着（画像検索）</span>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+								/>
+							</svg>
+						</a>
+					</div>
 				</div>
 			{/if}
 		</Modal>
