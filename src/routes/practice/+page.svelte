@@ -5,6 +5,7 @@
 	import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 	import type { Question } from '$lib/types';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 
 	// Import Atomic Components
 	import Button from '$lib/components/atoms/Button.svelte';
@@ -22,16 +23,21 @@
 	let notes = $state<Record<string, string>>({});
 
 	// Session type (morning or evening based on time)
-	let sessionType = $state<'morning' | 'evening'>('morning');
+	let sessionType = $state<'morning' | 'evening' | 'afternoon'>('morning');
 
 	userStore.subscribe((val) => {
 		user = val as any;
 	});
 
 	onMount(async () => {
-		// Determine session type based on current time
-		const hour = new Date().getHours();
-		sessionType = hour < 12 ? 'morning' : 'evening';
+		// Determine session type based on current time or URL parameter
+		const param = page.url.searchParams.get('session');
+		if (param === 'morning' || param === 'evening' || param === 'afternoon') {
+			sessionType = param as any;
+		} else {
+			const hour = new Date().getHours();
+			sessionType = hour < 12 ? 'morning' : 'evening';
+		}
 
 		if (user.uid) {
 			try {
@@ -106,6 +112,19 @@
 		}
 	}
 
+	// Calculate baseDate string (base timezone: morning starts at 7:00 AM)
+	function getBaseDateString() {
+		const now = new Date();
+		// If before 7:00 AM, baseDate is yesterday
+		if (now.getHours() < 7) {
+			now.setDate(now.getDate() - 1);
+		}
+		const yyyy = now.getFullYear();
+		const mm = String(now.getMonth() + 1).padStart(2, '0');
+		const dd = String(now.getDate()).padStart(2, '0');
+		return `${yyyy}-${mm}-${dd}`;
+	}
+
 	async function finishSession() {
 		isSessionFinished = true;
 		localStorage.removeItem('sqss_practice_session');
@@ -130,6 +149,54 @@
 				} catch (e) {
 					console.error('Error logging result for question:', q.questionId, e);
 				}
+			}
+
+			// Update Daily Stack Completed Status in Firestore
+			try {
+				const baseDate = getBaseDateString();
+				const goalRef = doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`);
+				const goalSnap = await getDoc(goalRef);
+
+				let morningCompleted = false;
+				let afternoonCompleted = false;
+
+				if (goalSnap.exists()) {
+					const data = goalSnap.data();
+					if (data.lastSessionDate === baseDate) {
+						morningCompleted = data.morningCompleted || false;
+						afternoonCompleted = data.afternoonCompleted || false;
+					}
+				}
+
+				if (sessionType === 'morning') {
+					morningCompleted = true;
+				} else if (sessionType === 'afternoon' || sessionType === 'evening') {
+					afternoonCompleted = true;
+				} else {
+					// Fallback based on hour if no param
+					const hour = new Date().getHours();
+					if (hour < 12) {
+						morningCompleted = true;
+					} else {
+						if (!morningCompleted) {
+							morningCompleted = true;
+						} else {
+							afternoonCompleted = true;
+						}
+					}
+				}
+
+				await setDoc(
+					goalRef,
+					{
+						lastSessionDate: baseDate,
+						morningCompleted,
+						afternoonCompleted
+					},
+					{ merge: true }
+				);
+			} catch (e) {
+				console.error('Error updating daily session completion flag:', e);
 			}
 		}
 	}

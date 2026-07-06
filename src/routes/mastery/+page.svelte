@@ -5,9 +5,11 @@
 	import { doc, getDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
 	import type { UserGoal, Goal, TagMatrix } from '$lib/types';
 
-	// Import Atomic Components
+	// Import Atomic/Molecular Components
 	import Progress from '$lib/components/atoms/Progress.svelte';
 	import Button from '$lib/components/atoms/Button.svelte';
+	import RivalGraph from '$lib/components/molecules/RivalGraph.svelte';
+	import TagChip from '$lib/components/molecules/TagChip.svelte';
 
 	let user = $state({ uid: null, loading: true });
 	let userGoal = $state<UserGoal | null>(null);
@@ -97,12 +99,12 @@
 	];
 </script>
 
-<div class="max-w-4xl mx-auto px-6 py-12 flex-grow flex flex-col space-y-12">
+<div class="max-w-6xl mx-auto px-6 py-12 flex-grow flex flex-col space-y-12">
 	{#if loadingData}
 		<div class="flex-grow flex items-center justify-center min-h-[40vh]">
 			<div class="w-8 h-8 border-2 border-brass border-t-transparent rounded-full animate-spin"></div>
 		</div>
-	{:else}
+	{:else if userGoal}
 		<div class="space-y-2 text-center">
 			<span class="text-[10px] tracking-[0.3em] text-brass font-serif uppercase"
 				>Study Loop and Mastery</span
@@ -115,7 +117,7 @@
 			</p>
 		</div>
 
-		<!-- Loop/Phase Selector -->
+		<!-- Mid-Term Loop/Phase Selector -->
 		<div
 			class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded shadow-md space-y-6"
 		>
@@ -160,44 +162,137 @@
 			</div>
 		</div>
 
-		<!-- Subject-by-subject mastery -->
-		<div class="space-y-6">
-			<h2 class="text-md font-serif font-bold tracking-widest text-text-light dark:text-text-dark uppercase">
-				科目別習得得点
-			</h2>
+		<!-- 2 columns: Subject mastery progress & Rival comparison graph -->
+		<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+			<!-- Subject-by-subject mastery -->
+			<div class="lg:col-span-2 space-y-4 text-left">
+				<h2 class="text-sm font-serif font-bold tracking-widest text-text-light dark:text-text-dark uppercase">
+					科目別習得得点
+				</h2>
 
-			<div class="space-y-4">
+				<div class="space-y-4">
+					{#each Object.entries(goalInfo?.weights || { 計画: 20, 環境_設備: 20, 法規: 30, 構造: 30, 施工: 25 }) as [subject, weight]}
+						{@const mastery = getSubjectMastery(subject, weight)}
+						<div
+							class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-6 rounded shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6"
+						>
+							<!-- Subject Info -->
+							<div class="sm:w-40 flex-shrink-0 space-y-1">
+								<h3 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">
+									{subject}
+								</h3>
+								<div class="text-[10px] text-gray-400 font-light">
+									配点ウエイト: {weight}点満点
+								</div>
+							</div>
+
+							<!-- Progress Gauge -->
+							<div class="flex-grow space-y-2 w-full">
+								<div class="flex justify-between text-[10px] font-light text-gray-400">
+									<span>習得度</span>
+									<span>{mastery.percentage}%</span>
+								</div>
+								<Progress value={mastery.percentage} max={100} />
+							</div>
+
+							<!-- Score Stats -->
+							<div class="sm:w-28 text-left sm:text-right flex-shrink-0 space-y-1">
+								<div class="text-[10px] text-gray-400 font-light">想定獲得点</div>
+								<div class="flex items-baseline sm:justify-end space-x-1">
+									<span class="text-xl font-serif font-black text-brass"
+										>{mastery.estimatedScore}</span
+									>
+									<span class="text-[10px] text-gray-400">/ {weight}点</span>
+								</div>
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Rival comparison (RivalGraph relocated from Dashboard) -->
+			<div
+				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col justify-between h-max text-left"
+			>
+				<div>
+					<h3 class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-2 text-center">
+						全国ライバル比較 (想定点分布)
+					</h3>
+					<RivalGraph score={userGoal?.estimatedScore || 0} />
+				</div>
+				<p class="text-xs font-light text-center text-gray-400 mt-4 leading-relaxed border-t border-gray-100 dark:border-gray-800 pt-4">
+					想定本試験得点：<span class="text-brass font-bold">{userGoal?.estimatedScore || 0}点</span><br/>
+					合格ライン90点に対して上位約 <span class="text-brass font-bold">42%</span> に位置しています。
+				</p>
+			</div>
+		</div>
+
+		<!-- Subject Combat Map (TagChip matrix relocated from Dashboard) -->
+		<div class="space-y-4">
+			<div class="flex items-center justify-between">
+				<h2 class="text-sm font-serif font-bold tracking-widest text-text-light dark:text-text-dark uppercase">
+					科目別・戦闘マップ（定着度ツリー）
+				</h2>
+				<div class="flex items-center space-x-4 text-xs font-light text-gray-400">
+					<div class="flex items-center space-x-1.5">
+						<span class="w-2 h-2 rounded-full bg-emerald-500/20 border border-emerald-500"></span>
+						<span>安全 (Safe)</span>
+					</div>
+					<div class="flex items-center space-x-1.5">
+						<span class="w-2 h-2 rounded-full bg-amber-500/20 border border-amber-500"></span>
+						<span>不安 (Unstable)</span>
+					</div>
+					<div class="flex items-center space-x-1.5">
+						<span class="w-2 h-2 rounded-full bg-rose-500/20 border border-rose-500"></span>
+						<span>危険 (Critical)</span>
+					</div>
+					<div class="flex items-center space-x-1.5">
+						<span
+							class="w-2 h-2 rounded-full bg-gray-500/10 border border-gray-300 dark:border-gray-800"
+						></span>
+						<span>未履修</span>
+					</div>
+				</div>
+			</div>
+
+			<!-- Grid based Combat Map -->
+			<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
 				{#each Object.entries(goalInfo?.weights || { 計画: 20, 環境_設備: 20, 法規: 30, 構造: 30, 施工: 25 }) as [subject, weight]}
-					{@const mastery = getSubjectMastery(subject, weight)}
+					{@const subjectTags = tagMatrixList.filter(
+						(t) =>
+							t.parentTopic === subject ||
+							(subject === '法規' &&
+								(t.tagName === '共用廊下' || t.tagName === '容積率' || t.tagName === '容積率緩和'))
+					)}
 					<div
-						class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-6 rounded shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6"
+						class="border border-gray-200 dark:border-gray-800 p-6 rounded bg-white dark:bg-bg-dark-sub flex flex-col justify-between text-left"
 					>
-						<!-- Subject Info -->
-						<div class="md:w-48 flex-shrink-0 space-y-1">
-							<h3 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">
-								{subject}
-							</h3>
-							<div class="text-[10px] text-gray-400 font-light">
-								配点ウエイト: {weight}点満点
+						<div>
+							<div class="flex justify-between items-baseline mb-2">
+								<span class="font-serif font-bold text-sm">{subject}</span>
+								<span class="text-[10px] text-gray-400 font-light font-serif">配点:{weight}</span>
 							</div>
+							<div class="border-t border-gray-100 dark:border-gray-800 my-2"></div>
 						</div>
 
-						<!-- Progress Gauge -->
-						<div class="flex-grow space-y-2">
-							<div class="flex justify-between text-[10px] font-light text-gray-400">
-								<span>習得度</span>
-								<span>{mastery.percentage}%</span>
-							</div>
-							<Progress value={mastery.percentage} max={100} />
-						</div>
-
-						<!-- Score Stats -->
-						<div class="md:w-36 text-left md:text-right flex-shrink-0 space-y-1">
-							<div class="text-[10px] text-gray-400 font-light">想定獲得点</div>
-							<div class="flex items-baseline md:justify-end space-x-1">
-								<span class="text-2xl font-serif font-black text-brass">{mastery.estimatedScore}</span>
-								<span class="text-[10px] text-gray-400">/ {weight}点</span>
-							</div>
+						<!-- Tags under this subject -->
+						<div class="space-y-2 mt-4">
+							{#if subjectTags.length > 0}
+								{#each subjectTags as tag}
+									<TagChip
+										tagName={tag.tagName}
+										masteryLevel={tag.aiEstimation?.masteryLevel}
+										correctCount={tag.stats?.totalCorrect}
+										attemptedCount={tag.stats?.totalAttempted}
+									/>
+								{/each}
+							{:else}
+								<div
+									class="p-2 border border-dashed border-gray-200 dark:border-gray-800 text-[10px] rounded text-center text-gray-400 font-light"
+								>
+									未履修
+								</div>
+							{/if}
 						</div>
 					</div>
 				{/each}

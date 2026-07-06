@@ -4,12 +4,10 @@
 	import { db } from '$lib/firebase';
 	import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
 	import { page } from '$app/state';
-	import type { UserGoal, Goal, TagMatrix, DailyColumn } from '$lib/types';
+	import type { UserGoal, Goal, DailyColumn } from '$lib/types';
 
 	// Import Atomic Components
 	import Meter from '$lib/components/molecules/Meter.svelte';
-	import RivalGraph from '$lib/components/molecules/RivalGraph.svelte';
-	import TagChip from '$lib/components/molecules/TagChip.svelte';
 	import Progress from '$lib/components/atoms/Progress.svelte';
 	import Button from '$lib/components/atoms/Button.svelte';
 	import Badge from '$lib/components/atoms/Badge.svelte';
@@ -20,7 +18,6 @@
 	let user = $state({ uid: null, planStatus: 'free', loading: true });
 	let userGoal = $state<UserGoal | null>(null);
 	let goalInfo = $state<Goal | null>(null);
-	let tagMatrixList = $state<TagMatrix[]>([]);
 	let dailyColumns = $state<DailyColumn[]>([]);
 
 	let loadingData = $state(true);
@@ -38,6 +35,37 @@
 
 	userStore.subscribe((val) => {
 		user = val as any;
+	});
+
+	// Calculate baseDate string (base timezone: morning starts at 7:00 AM)
+	function getBaseDateString() {
+		const now = new Date();
+		// If before 7:00 AM, baseDate is yesterday
+		if (now.getHours() < 7) {
+			now.setDate(now.getDate() - 1);
+		}
+		const yyyy = now.getFullYear();
+		const mm = String(now.getMonth() + 1).padStart(2, '0');
+		const dd = String(now.getDate()).padStart(2, '0');
+		return `${yyyy}-${mm}-${dd}`;
+	}
+
+	// Derived states for practice session completion
+	let todayBaseDate = $derived(getBaseDateString());
+	let isNewDay = $derived(userGoal?.lastSessionDate !== todayBaseDate);
+
+	let morningFinished = $derived(isNewDay ? false : (userGoal?.morningCompleted || false));
+	let afternoonFinished = $derived(isNewDay ? false : (userGoal?.afternoonCompleted || false));
+
+	// Check if afternoon session is unlocked based on hour
+	let isAfternoonUnlocked = $derived(new Date().getHours() >= 12);
+
+	// Calculate current stack count (0, 1, or 2)
+	let exerciseStackCount = $derived.by(() => {
+		let count = 0;
+		if (!morningFinished) count++;
+		if (isAfternoonUnlocked && !afternoonFinished) count++;
+		return count;
 	});
 
 	async function openProgressDialog() {
@@ -115,16 +143,6 @@
 					goalInfo = goalSnap.data() as Goal;
 				}
 
-				// Load user's tag matrix
-				const tagMatrixSnap = await getDocs(
-					collection(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/tagMatrix`)
-				);
-				const tempTags: TagMatrix[] = [];
-				tagMatrixSnap.forEach((doc) => {
-					tempTags.push({ tagName: doc.id, ...doc.data() } as TagMatrix);
-				});
-				tagMatrixList = tempTags;
-
 				// Load daily columns
 				const columnsSnap = await getDocs(collection(db, 'goals/1kyu_kenchikushi/daily_columns'));
 				const tempCols: DailyColumn[] = [];
@@ -178,8 +196,8 @@
 			<div class="w-8 h-8 border-2 border-brass border-t-transparent rounded-full animate-spin"></div>
 		</div>
 	{:else}
-		<!-- TOP OVERVIEW SECTION -->
-		<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+		<!-- TOP OVERVIEW SECTION (Restructured to 2 columns) -->
+		<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 			<!-- 1. Estimated Score Meter -> Leads to Mastery Page -->
 			<a
 				href="/mastery"
@@ -198,23 +216,7 @@
 				</p>
 			</a>
 
-			<!-- 2. Bell Curve / Rival Graph -> Leads to Mastery Page -->
-			<a
-				href="/mastery"
-				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col justify-between group hover:border-brass/60 transition-colors duration-300"
-			>
-				<h3
-					class="text-xs tracking-widest text-gray-400 uppercase font-serif mb-2 text-center group-hover:text-brass transition-colors"
-				>
-					全国ライバル比較（習得度詳細へ）
-				</h3>
-				<RivalGraph score={userGoal?.estimatedScore || 0} />
-				<p class="text-xs font-light text-center text-gray-400 mt-2">
-					あなたは現在、上位約 <span class="text-brass font-bold">42%</span> に位置しています。
-				</p>
-			</a>
-
-			<!-- 3. Countdown & Target Info -> Leads to Curriculum Page -->
+			<!-- 2. Countdown & Target Info -> Leads to Curriculum Page -->
 			<div
 				class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded flex flex-col justify-between"
 			>
@@ -246,75 +248,77 @@
 			</div>
 		</div>
 
-		<!-- BATTLE MAP / TREEMAP AREA -->
-		<div class="space-y-4">
-			<div class="flex items-center justify-between">
-				<h2 class="text-lg font-serif font-bold tracking-widest text-text-light dark:text-text-dark uppercase">
-					科目別・戦闘マップ（定着度ツリー）
-				</h2>
-				<div class="flex items-center space-x-4 text-xs font-light text-gray-400">
-					<div class="flex items-center space-x-1.5">
-						<span class="w-2.5 h-2.5 rounded-full bg-emerald-500/20 border border-emerald-500"></span>
-						<span>安全 (Safe)</span>
-					</div>
-					<div class="flex items-center space-x-1.5">
-						<span class="w-2.5 h-2.5 rounded-full bg-amber-500/20 border border-amber-500"></span>
-						<span>不安 (Unstable)</span>
-					</div>
-					<div class="flex items-center space-x-1.5">
-						<span class="w-2.5 h-2.5 rounded-full bg-rose-500/20 border border-rose-500"></span>
-						<span>危険 (Critical)</span>
-					</div>
-					<div class="flex items-center space-x-1.5">
-						<span
-							class="w-2.5 h-2.5 rounded-full bg-gray-500/10 border border-gray-300 dark:border-gray-800"
-						></span>
-						<span>未履修</span>
-					</div>
+		<!-- 3. DAILY PRACTICE TASK STACK SECTION (New feature) -->
+		<div class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded shadow-md text-left space-y-6">
+			<div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 gap-2">
+				<div>
+					<h2 class="text-md font-serif font-bold tracking-widest text-text-light dark:text-text-dark uppercase">
+						毎日の過去問演習（10問 ✕ 2回）
+					</h2>
+					<p class="text-xs font-light text-gray-400 mt-1">
+						朝7:00と昼12:00に配信。解いていない未消化分は当日中のみスタックされます。
+					</p>
+				</div>
+				<div class="flex items-center space-x-2">
+					<span class="text-[10px] tracking-widest text-gray-400 font-bold uppercase">現在のスタック状況:</span>
+					<span class="px-2.5 py-0.5 rounded text-xs font-bold font-serif {exerciseStackCount > 0 ? 'bg-brass text-white animate-pulse' : 'bg-emerald-500/10 text-emerald-500'}">
+						{exerciseStackCount > 0 ? `${exerciseStackCount}回分 未消化` : '完了'}
+					</span>
 				</div>
 			</div>
 
-			<!-- Grid based Combat Map -->
-			<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-				{#each Object.entries(goalInfo?.weights || { 計画: 20, 環境_設備: 20, 法規: 30, 構造: 30, 施工: 25 }) as [subject, weight]}
-					{@const subjectTags = tagMatrixList.filter(
-						(t) =>
-							t.parentTopic === subject ||
-							(subject === '法規' &&
-								(t.tagName === '共用廊下' || t.tagName === '容積率' || t.tagName === '容積率緩和'))
-					)}
-					<div
-						class="border border-gray-200 dark:border-gray-800 p-6 rounded bg-white dark:bg-bg-dark-sub flex flex-col justify-between"
-					>
-						<div>
-							<div class="flex justify-between items-baseline mb-2">
-								<span class="font-serif font-bold text-sm">{subject}</span>
-								<span class="text-[10px] text-gray-400 font-light">配点:{weight}</span>
-							</div>
-							<div class="border-t border-gray-100 dark:border-gray-800 my-2"></div>
-						</div>
-
-						<!-- Tags under this subject -->
-						<div class="space-y-2 mt-4">
-							{#if subjectTags.length > 0}
-								{#each subjectTags as tag}
-									<TagChip
-										tagName={tag.tagName}
-										masteryLevel={tag.aiEstimation?.masteryLevel}
-										correctCount={tag.stats?.totalCorrect}
-										attemptedCount={tag.stats?.totalAttempted}
-									/>
-								{/each}
-							{:else}
-								<div
-									class="p-2 border border-dashed border-gray-200 dark:border-gray-800 text-[10px] rounded text-center text-gray-400 font-light"
-								>
-									未履修
-								</div>
-							{/if}
-						</div>
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+				<!-- Morning session -->
+				<div class="p-6 border rounded flex flex-col justify-between items-start space-y-4 {morningFinished ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-gray-200 dark:border-gray-800'}">
+					<div class="space-y-1">
+						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">AM 07:00 配信</span>
+						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">朝の過去問演習 (10問)</h4>
+						<p class="text-[10px] font-light text-gray-400">一日の学習インデックスを朝一番に構築</p>
 					</div>
-				{/each}
+
+					<div class="w-full flex items-center justify-between pt-2">
+						<span class="text-xs font-light {morningFinished ? 'text-emerald-500 font-bold' : 'text-gray-400'}">
+							{morningFinished ? '✓ 演習完了' : '未完了'}
+						</span>
+						{#if !morningFinished}
+							<a
+								href="/practice?session=morning"
+								class="px-4 py-2 bg-brass hover:bg-brass-dark text-white text-[10px] tracking-widest font-bold rounded transition-all duration-300"
+							>
+								演習を開始する
+							</a>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Afternoon session -->
+				<div class="p-6 border rounded flex flex-col justify-between items-start space-y-4 {afternoonFinished ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-gray-200 dark:border-gray-800'}">
+					<div class="space-y-1">
+						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">PM 12:00 配信</span>
+						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">昼・夕方の過去問演習 (10問)</h4>
+						<p class="text-[10px] font-light text-gray-400">午後の空き時間に知識の定着度をテスト</p>
+					</div>
+
+					<div class="w-full flex items-center justify-between pt-2">
+						{#if !isAfternoonUnlocked}
+							<span class="text-xs font-light text-gray-400">
+								🔒 12:00に解放されます
+							</span>
+						{:else}
+							<span class="text-xs font-light {afternoonFinished ? 'text-emerald-500 font-bold' : 'text-gray-400'}">
+								{afternoonFinished ? '✓ 演習完了' : '未完了'}
+							</span>
+							{#if !afternoonFinished}
+								<a
+									href="/practice?session=afternoon"
+									class="px-4 py-2 bg-brass hover:bg-brass-dark text-white text-[10px] tracking-widest font-bold rounded transition-all duration-300"
+								>
+									演習を開始する
+								</a>
+							{/if}
+						{/if}
+					</div>
+				</div>
 			</div>
 		</div>
 
@@ -329,10 +333,10 @@
 						>Premium Plan</span
 					>
 					<h3 class="text-md font-serif font-bold text-text-light dark:text-text-dark">
-						AI処方特訓＆全問題解放 (月額 980円)
+						カリキュラム管理＆全問題解放 (月額 980円)
 					</h3>
 					<p class="text-xs font-light text-gray-400 max-w-xl">
-						プレミアムプランに登録すると、夜の30分「AI処方特訓」による混同バグの自動診断、無制限の一問一答、および最新時事コラムの全容を表示させることができます。
+						プレミアムプランに登録すると、夜のカリキュラム進捗管理、週次学習計画の詳細なカスタマイズ、無制限の1問1答演習、および過去ログのすべてを閲覧可能になります。
 					</p>
 				</div>
 				<Button onclick={handleUpgrade} disabled={billingRedirecting}>
@@ -342,7 +346,7 @@
 		{/if}
 
 		<!-- DAILY COLUMN SECTION -->
-		<div class="space-y-4">
+		<div class="space-y-4 text-left">
 			<h2 class="text-lg font-serif font-bold tracking-widest text-text-light dark:text-text-dark uppercase">
 				今日の学習コラム（AI編纂）
 			</h2>
