@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/store';
 	import { db } from '$lib/firebase';
-	import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+	import { doc, getDoc, updateDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 	import { page } from '$app/state';
 	import type { UserGoal, Goal, TagMatrix, DailyColumn } from '$lib/types';
 
@@ -15,9 +15,78 @@
 	let loadingData = $state(true);
 	let billingRedirecting = $state(false);
 
+	// Progress Dialog States
+	let showProgressDialog = $state(false);
+	let progressLogs = $state<any[]>([]);
+	let loadingProgressLogs = $state(false);
+	let editingNotes = $state<Record<string, string>>({});
+	let savingNoteId = $state<string | null>(null);
+
 	userStore.subscribe((val) => {
 		user = val as any;
 	});
+
+	async function openProgressDialog() {
+		showProgressDialog = true;
+		if (!user.uid) return;
+		loadingProgressLogs = true;
+		try {
+			const logsSnap = await getDocs(
+				collection(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/questionLogs`)
+			);
+			const logs: any[] = [];
+			logsSnap.forEach((doc) => {
+				logs.push({ questionId: doc.id, ...doc.data() });
+			});
+
+			const questionsSnap = await getDocs(
+				collection(db, 'goals/1kyu_kenchikushi/past_questions')
+			);
+			const questions: any[] = [];
+			questionsSnap.forEach((doc) => {
+				questions.push({ questionId: doc.id, ...doc.data() });
+			});
+
+			progressLogs = logs.map((log) => {
+				const q = questions.find((item) => item.questionId === log.questionId);
+				editingNotes[log.questionId] = log.note || '';
+				return {
+					...log,
+					questionText: q?.questionText || '問題が見つかりません。',
+					subject: q?.subject || '不明',
+					chapter: q?.chapter || '不明'
+				};
+			});
+		} catch (e) {
+			console.error('Error fetching progress logs:', e);
+		} finally {
+			loadingProgressLogs = false;
+		}
+	}
+
+	async function saveProgressNote(questionId: string) {
+		if (!user.uid) return;
+		savingNoteId = questionId;
+		try {
+			const ref = doc(
+				db,
+				`users/${user.uid}/user_goals/1kyu_kenchikushi/questionLogs/${questionId}`
+			);
+			await setDoc(ref, { note: editingNotes[questionId] }, { merge: true });
+
+			progressLogs = progressLogs.map((log) => {
+				if (log.questionId === questionId) {
+					return { ...log, note: editingNotes[questionId] };
+				}
+				return log;
+			});
+		} catch (e) {
+			console.error(e);
+			alert('ノートの保存に失敗しました');
+		} finally {
+			savingNoteId = null;
+		}
+	}
 
 	// Calculated values
 	let daysLeft = $state(0);
@@ -256,13 +325,13 @@
 					</div>
 				</div>
 
-				<div class="mt-6 space-y-3">
+				<button onclick={openProgressDialog} class="mt-6 space-y-3 w-full text-left focus:outline-none hover:opacity-85 transition-opacity group cursor-pointer">
 					<div class="flex justify-between text-xs font-light">
-						<span class="text-gray-400">今週の演習ノルマ</span>
+						<span class="text-gray-400 group-hover:text-brass transition-colors">今週の演習ノルマ（クリックで履歴ダイアログを表示）</span>
 						<span class="text-text-light dark:text-text-dark font-medium">12問 / 50問</span>
 					</div>
-					<progress class="w-full h-1.5 rounded overflow-hidden accent-brass [&::-webkit-progress-bar]:bg-gray-100 dark:[&::-webkit-progress-bar]:bg-gray-900 [&::-webkit-progress-value]:bg-brass [&::-moz-progress-bar]:bg-brass" value="12" max="50"></progress>
-				</div>
+					<progress class="w-full h-1.5 rounded overflow-hidden accent-brass [&::-webkit-progress-bar]:bg-gray-100 dark:[&::-webkit-progress-bar]:bg-gray-900 [&::-webkit-progress-value]:bg-brass [&::-moz-progress-bar]:bg-brass pointer-events-none" value="12" max="50"></progress>
+				</button>
 			</div>
 		</div>
 
@@ -406,5 +475,99 @@
 				{/each}
 			</div>
 		</div>
+		<!-- Progress dialog (modal) -->
+		{#if showProgressDialog}
+			<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-all duration-300">
+				<!-- Modal Container -->
+				<div class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 w-full max-w-2xl rounded max-h-[85vh] flex flex-col shadow-2xl overflow-hidden text-left">
+					<!-- Modal Header -->
+					<div class="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+						<h3 class="font-serif font-bold text-sm tracking-widest text-text-light dark:text-text-dark uppercase">
+							今週の学習進捗とノート一覧
+						</h3>
+						<button
+							onclick={() => (showProgressDialog = false)}
+							class="text-gray-400 hover:text-brass transition-colors focus:outline-none"
+							aria-label="閉じる"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+							</svg>
+						</button>
+					</div>
+
+					<!-- Modal Body (Scrollable) -->
+					<div class="p-6 overflow-y-auto space-y-6 flex-grow">
+						{#if loadingProgressLogs}
+							<div class="py-12 flex flex-col items-center justify-center space-y-4">
+								<div class="w-6 h-6 border-2 border-brass border-t-transparent rounded-full animate-spin"></div>
+								<p class="text-[10px] tracking-widest text-gray-400 font-serif animate-pulse">読み込み中...</p>
+							</div>
+						{:else if progressLogs.length === 0}
+							<div class="text-center py-12 text-gray-400 font-light text-xs">
+								まだ解いた問題の履歴がありません。
+							</div>
+						{:else}
+							<div class="space-y-6 divide-y divide-gray-100 dark:divide-gray-800/40">
+								{#each progressLogs as log, index}
+									<div class="space-y-3 {index === 0 ? '' : 'pt-6'}">
+										<div class="flex items-center justify-between text-[10px] text-gray-400">
+											<span>肢 ID: {log.questionId}（{log.subject} • {log.chapter}）</span>
+											<span class="font-light">最終演習: {new Date(log.lastAttemptedAt).toLocaleDateString()}</span>
+										</div>
+
+										<p class="text-xs font-serif font-light text-text-light dark:text-text-dark leading-relaxed">
+											「{log.questionText}」
+										</p>
+
+										<div class="flex items-center space-x-4 text-[10px] text-gray-400 font-mono">
+											<span>解いた回数: {log.history?.attemptCount || 0}回</span>
+											<span class="text-emerald-500">正解: {log.history?.correctCount || 0}回</span>
+											<span class="text-rose-500">不正解: {log.history?.incorrectCount || 0}回</span>
+										</div>
+
+										<!-- Notebook/Memo edit in modal -->
+										<div class="space-y-1.5 pt-2">
+											<div class="flex items-center justify-between">
+												<label for="modal-note-{log.questionId}" class="text-[8px] font-bold text-brass tracking-widest uppercase">ノート（メモ）</label>
+												{#if savingNoteId === log.questionId}
+													<span class="text-[8px] text-gray-400 animate-pulse">保存中...</span>
+												{/if}
+											</div>
+											<div class="flex space-x-2">
+												<input
+													type="text"
+													id="modal-note-{log.questionId}"
+													bind:value={editingNotes[log.questionId]}
+													placeholder="メモを入力..."
+													class="flex-grow px-3 py-1.5 text-xs bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-800 focus:border-brass outline-none rounded text-text-light dark:text-text-dark transition-all duration-300"
+												/>
+												<button
+													onclick={() => saveProgressNote(log.questionId)}
+													disabled={savingNoteId === log.questionId}
+													class="px-3 py-1.5 bg-brass hover:bg-brass-dark text-white text-[9px] tracking-wider rounded font-bold transition-all duration-300 disabled:opacity-50"
+												>
+													保存
+												</button>
+											</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Modal Footer -->
+					<div class="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-black/10 flex justify-end">
+						<button
+							onclick={() => showProgressDialog = false}
+							class="px-4 py-2 border border-gray-200 dark:border-gray-800 text-text-light dark:text-text-dark text-[10px] tracking-widest font-bold uppercase rounded hover:border-brass transition-all duration-300 cursor-pointer"
+						>
+							閉じる
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
 	{/if}
 </div>

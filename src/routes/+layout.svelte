@@ -140,7 +140,7 @@
 			<!-- Nav / Right section -->
 			<div class="flex items-center space-x-6">
 				{#if user.uid}
-					<nav class="hidden md:flex items-center space-x-8 text-sm font-light">
+					<nav class="hidden md:flex items-center space-x-6 text-sm font-light">
 						<a
 							href="/dashboard"
 							class="hover:text-brass transition-colors {page.url.pathname === '/dashboard'
@@ -160,10 +160,22 @@
 								: ''}">AI処方特訓</a
 						>
 						<a
+							href="/mastery"
+							class="hover:text-brass transition-colors {page.url.pathname === '/mastery'
+								? 'text-brass font-normal border-b border-brass pb-1'
+								: ''}">習得度</a
+						>
+						<a
 							href="/logs"
 							class="hover:text-brass transition-colors {page.url.pathname === '/logs'
 								? 'text-brass font-normal border-b border-brass pb-1'
 								: ''}">学習ログ</a
+						>
+						<a
+							href="/settings"
+							class="hover:text-brass transition-colors {page.url.pathname === '/settings'
+								? 'text-brass font-normal border-b border-brass pb-1'
+								: ''}">設定</a
 						>
 					</nav>
 				{/if}

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { userStore } from '$lib/store';
 	import { db } from '$lib/firebase';
-	import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+	import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 	import type { Question } from '$lib/types';
 	import { goto } from '$app/navigation';
 
@@ -13,8 +13,29 @@
 	let isSessionFinished = $state(false);
 	let loadingData = $state(true);
 
+	// Notes states
+	let notes = $state<Record<string, string>>({});
+	let noteStatus = $state<Record<string, string>>({}); // 'idle' | 'saving' | 'saved' | 'error'
+
 	// Session type (morning or evening based on time)
 	let sessionType = $state<'morning' | 'evening'>('morning');
+
+	async function saveNote(questionId: string) {
+		if (!user.uid) return;
+		const text = notes[questionId] || '';
+		noteStatus[questionId] = 'saving';
+		try {
+			const ref = doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi/questionLogs/${questionId}`);
+			await setDoc(ref, { note: text }, { merge: true });
+			noteStatus[questionId] = 'saved';
+			setTimeout(() => {
+				noteStatus[questionId] = 'idle';
+			}, 2000);
+		} catch (e) {
+			console.error(e);
+			noteStatus[questionId] = 'error';
+		}
+	}
 
 	userStore.subscribe((val) => {
 		user = val as any;
@@ -236,6 +257,34 @@
 								<p class="text-xs font-light text-gray-500 dark:text-gray-400 leading-relaxed">
 									{q.explanation}
 								</p>
+							</div>
+
+							<!-- Note saving form -->
+							<div class="mt-2 space-y-2 border-t border-gray-100 dark:border-gray-800/40 pt-3">
+								<div class="flex items-center justify-between">
+									<label for="note-{q.questionId}" class="text-[9px] font-bold text-brass tracking-wider uppercase">学習ノート（メモ）</label>
+									{#if noteStatus[q.questionId] === 'saving'}
+										<span class="text-[9px] text-gray-400">保存中...</span>
+									{:else if noteStatus[q.questionId] === 'saved'}
+										<span class="text-[9px] text-emerald-500 font-bold">✓ 保存されました</span>
+									{:else if noteStatus[q.questionId] === 'error'}
+										<span class="text-[9px] text-rose-500 font-bold">保存エラー</span>
+									{/if}
+								</div>
+								<div class="flex space-x-2">
+									<textarea
+										id="note-{q.questionId}"
+										bind:value={notes[q.questionId]}
+										placeholder="この問題に関するメモを書き残せます（例: 共用廊下は容積率不算入！地階の1/3制限と混同しないこと）"
+										class="flex-grow p-2 text-xs bg-white dark:bg-black/20 border border-gray-200 dark:border-gray-800 focus:border-brass outline-none rounded text-text-light dark:text-text-dark resize-none h-12 transition-all duration-300"
+									></textarea>
+									<button
+										onclick={() => saveNote(q.questionId)}
+										class="px-3 py-2 bg-brass hover:bg-brass-dark text-white text-[10px] tracking-wider rounded font-bold transition-all duration-300 active:scale-[0.97] self-end"
+									>
+										保存
+									</button>
+								</div>
 							</div>
 						</div>
 					{/each}
