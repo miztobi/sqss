@@ -38,9 +38,18 @@
 			const hour = new Date().getHours();
 			sessionType = hour < 12 ? 'morning' : 'evening';
 		}
-
 		if (user.uid) {
 			try {
+				// Load user goal to get custom question count per session
+				let limitCount = 10;
+				const userGoalSnap = await getDoc(
+					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
+				);
+				if (userGoalSnap.exists()) {
+					const data = userGoalSnap.data();
+					limitCount = data.questionCountPerSession || 10;
+				}
+
 				// Load past questions from Firestore
 				const questionsSnap = await getDocs(
 					collection(db, 'goals/1kyu_kenchikushi/past_questions')
@@ -50,8 +59,8 @@
 					tempQuestions.push({ questionId: doc.id, ...doc.data() } as Question);
 				});
 
-				// Slice to 10 questions max for daily set (fallback to all if < 10)
-				questions = tempQuestions.slice(0, 10);
+				// Slice to preferred questions count
+				questions = tempQuestions.slice(0, limitCount);
 
 				// Load question notes
 				for (const q of questions) {

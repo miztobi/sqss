@@ -11,6 +11,9 @@
 
 	let intensity = $state(30);
 	let targetGoalId = $state('1kyu_kenchikushi');
+	let morningTime = $state('07:00');
+	let afternoonTime = $state('12:00');
+	let questionCount = $state(10);
 	let isSaving = $state(false);
 	let saveMessage = $state('');
 	let billingRedirecting = $state(false);
@@ -29,6 +32,9 @@
 					userGoal = userGoalSnap.data() as UserGoal;
 					intensity = userGoal.intensityPreference;
 					targetGoalId = userGoal.goalId;
+					morningTime = userGoal.morningNotificationTime || '07:00';
+					afternoonTime = userGoal.afternoonNotificationTime || '12:00';
+					questionCount = userGoal.questionCountPerSession || 10;
 				}
 			} catch (e) {
 				console.error(e);
@@ -46,7 +52,10 @@
 			const ref = doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`);
 			await updateDoc(ref, {
 				intensityPreference: intensity,
-				goalId: targetGoalId
+				goalId: targetGoalId,
+				morningNotificationTime: morningTime,
+				afternoonNotificationTime: afternoonTime,
+				questionCountPerSession: questionCount
 			});
 			saveMessage = '設定を保存しました';
 			setTimeout(() => {
@@ -156,6 +165,47 @@
 									</button>
 								{/each}
 							</div>
+						</div>
+
+						<!-- Notification Time Settings -->
+						<div class="grid grid-cols-2 gap-4 pt-2">
+							<div class="space-y-2">
+								<span class="text-[10px] tracking-widest text-gray-400 uppercase font-bold"
+									>朝の配信・通知時刻</span
+								>
+								<input
+									type="time"
+									bind:value={morningTime}
+									class="w-full px-4 py-2 text-xs bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-800 focus:border-brass outline-none rounded text-text-light dark:text-text-dark font-serif"
+								/>
+							</div>
+
+							<div class="space-y-2">
+								<span class="text-[10px] tracking-widest text-gray-400 uppercase font-bold"
+									>昼の配信・通知時刻</span
+								>
+								<input
+									type="time"
+									bind:value={afternoonTime}
+									class="w-full px-4 py-2 text-xs bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-800 focus:border-brass outline-none rounded text-text-light dark:text-text-dark font-serif"
+								/>
+							</div>
+						</div>
+
+						<!-- Question Count Preference -->
+						<div class="space-y-2 pt-2">
+							<span class="text-[10px] tracking-widest text-gray-400 uppercase font-bold"
+								>1回の過去問演習問題数</span
+							>
+							<select
+								bind:value={questionCount}
+								class="w-full px-4 py-2.5 text-xs bg-gray-50 dark:bg-black/30 border border-gray-200 dark:border-gray-800 focus:border-brass outline-none rounded text-text-light dark:text-text-dark font-serif"
+							>
+								<option value={5}>5問（短時間・ライト）</option>
+								<option value={10}>10問（標準設定）</option>
+								<option value={15}>15問（本格的）</option>
+								<option value={20}>20問（ハイペース）</option>
+							</select>
 						</div>
 					</div>
 

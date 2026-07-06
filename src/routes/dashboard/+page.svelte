@@ -57,13 +57,29 @@
 	let morningFinished = $derived(isNewDay ? false : (userGoal?.morningCompleted || false));
 	let afternoonFinished = $derived(isNewDay ? false : (userGoal?.afternoonCompleted || false));
 
-	// Check if afternoon session is unlocked based on hour
-	let isAfternoonUnlocked = $derived(new Date().getHours() >= 12);
+	// Helper to check if setting notification time is passed
+	function isTimePassed(timeStr: string) {
+		if (!timeStr) return false;
+		const [targetHour, targetMin] = timeStr.split(':').map(Number);
+		const now = new Date();
+		const nowHour = now.getHours();
+		const nowMin = now.getMinutes();
+		if (nowHour > targetHour) return true;
+		if (nowHour === targetHour && nowMin >= targetMin) return true;
+		return false;
+	}
+
+	// Check if sessions are unlocked based on custom settings
+	let morningTimeLimit = $derived(userGoal?.morningNotificationTime || '07:00');
+	let afternoonTimeLimit = $derived(userGoal?.afternoonNotificationTime || '12:00');
+
+	let isMorningUnlocked = $derived(isTimePassed(morningTimeLimit));
+	let isAfternoonUnlocked = $derived(isTimePassed(afternoonTimeLimit));
 
 	// Calculate current stack count (0, 1, or 2)
 	let exerciseStackCount = $derived.by(() => {
 		let count = 0;
-		if (!morningFinished) count++;
+		if (isMorningUnlocked && !morningFinished) count++;
 		if (isAfternoonUnlocked && !afternoonFinished) count++;
 		return count;
 	});
@@ -271,22 +287,28 @@
 				<!-- Morning session -->
 				<div class="p-6 border rounded flex flex-col justify-between items-start space-y-4 {morningFinished ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-gray-200 dark:border-gray-800'}">
 					<div class="space-y-1">
-						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">AM 07:00 配信</span>
-						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">朝の過去問演習 (10問)</h4>
+						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">AM {morningTimeLimit} 配信</span>
+						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">朝の過去問演習 ({userGoal?.questionCountPerSession || 10}問)</h4>
 						<p class="text-[10px] font-light text-gray-400">一日の学習インデックスを朝一番に構築</p>
 					</div>
 
 					<div class="w-full flex items-center justify-between pt-2">
-						<span class="text-xs font-light {morningFinished ? 'text-emerald-500 font-bold' : 'text-gray-400'}">
-							{morningFinished ? '✓ 演習完了' : '未完了'}
-						</span>
-						{#if !morningFinished}
-							<a
-								href="/practice?session=morning"
-								class="px-4 py-2 bg-brass hover:bg-brass-dark text-white text-[10px] tracking-widest font-bold rounded transition-all duration-300"
-							>
-								演習を開始する
-							</a>
+						{#if !isMorningUnlocked}
+							<span class="text-xs font-light text-gray-400">
+								🔒 {morningTimeLimit}に解放されます
+							</span>
+						{:else}
+							<span class="text-xs font-light {morningFinished ? 'text-emerald-500 font-bold' : 'text-gray-400'}">
+								{morningFinished ? '✓ 演習完了' : '未完了'}
+							</span>
+							{#if !morningFinished}
+								<a
+									href="/practice?session=morning"
+									class="px-4 py-2 bg-brass hover:bg-brass-dark text-white text-[10px] tracking-widest font-bold rounded transition-all duration-300"
+								>
+									演習を開始する
+								</a>
+							{/if}
 						{/if}
 					</div>
 				</div>
@@ -294,15 +316,15 @@
 				<!-- Afternoon session -->
 				<div class="p-6 border rounded flex flex-col justify-between items-start space-y-4 {afternoonFinished ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-gray-200 dark:border-gray-800'}">
 					<div class="space-y-1">
-						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">PM 12:00 配信</span>
-						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">昼・夕方の過去問演習 (10問)</h4>
+						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">PM {afternoonTimeLimit} 配信</span>
+						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">昼・夕方の過去問演習 ({userGoal?.questionCountPerSession || 10}問)</h4>
 						<p class="text-[10px] font-light text-gray-400">午後の空き時間に知識の定着度をテスト</p>
 					</div>
 
 					<div class="w-full flex items-center justify-between pt-2">
 						{#if !isAfternoonUnlocked}
 							<span class="text-xs font-light text-gray-400">
-								🔒 12:00に解放されます
+								🔒 {afternoonTimeLimit}に解放されます
 							</span>
 						{:else}
 							<span class="text-xs font-light {afternoonFinished ? 'text-emerald-500 font-bold' : 'text-gray-400'}">

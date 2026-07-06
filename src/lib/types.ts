@@ -17,6 +17,9 @@ export interface UserGoal {
 	lastSessionDate?: string;
 	morningCompleted?: boolean;
 	afternoonCompleted?: boolean;
+	morningNotificationTime?: string;
+	afternoonNotificationTime?: string;
+	questionCountPerSession?: number;
 }
 
 export interface TagStats {
