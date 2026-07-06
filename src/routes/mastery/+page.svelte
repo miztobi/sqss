@@ -5,6 +5,10 @@
 	import { doc, getDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
 	import type { UserGoal, Goal, TagMatrix } from '$lib/types';
 
+	// Import Atomic Components
+	import Progress from '$lib/components/atoms/Progress.svelte';
+	import Button from '$lib/components/atoms/Button.svelte';
+
 	let user = $state({ uid: null, loading: true });
 	let userGoal = $state<UserGoal | null>(null);
 	let goalInfo = $state<Goal | null>(null);
@@ -128,18 +132,19 @@
 
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 				{#each loopModes as mode}
-					<button
+					<Button
+						variant={userGoal?.currentLoop === mode.value ? 'primary' : 'outline'}
 						onclick={() => updateLoopMode(mode.value)}
 						disabled={isSavingLoop}
-						class="p-6 border text-left rounded transition-all duration-300 active:scale-[0.98] {userGoal?.currentLoop ===
+						class="p-6 text-left flex flex-col items-start justify-start h-auto w-full {userGoal?.currentLoop ===
 						mode.value
 							? 'border-brass bg-brass/5'
-							: 'border-gray-200 dark:border-gray-800 hover:border-brass/40 bg-transparent'}"
+							: 'border-gray-200 dark:border-gray-800 bg-transparent'}"
 					>
 						<span
 							class="text-[10px] font-bold tracking-widest uppercase block mb-1 {userGoal?.currentLoop ===
 							mode.value
-								? 'text-brass'
+								? 'text-brass-light'
 								: 'text-gray-400'}"
 						>
 							Phase 0{mode.value}
@@ -150,7 +155,7 @@
 						<p class="text-[10px] font-light text-gray-400 leading-relaxed">
 							{mode.desc}
 						</p>
-					</button>
+					</Button>
 				{/each}
 			</div>
 		</div>
@@ -183,9 +188,7 @@
 								<span>習得度</span>
 								<span>{mastery.percentage}%</span>
 							</div>
-							<div class="w-full bg-gray-100 dark:bg-black/30 h-2 rounded overflow-hidden">
-								<div class="bg-brass h-full transition-all duration-1000" style="width: {mastery.percentage}%"></div>
-							</div>
+							<Progress value={mastery.percentage} max={100} />
 						</div>
 
 						<!-- Score Stats -->
