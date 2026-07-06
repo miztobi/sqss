@@ -56,6 +56,7 @@
 
 	let morningFinished = $derived(isNewDay ? false : (userGoal?.morningCompleted || false));
 	let afternoonFinished = $derived(isNewDay ? false : (userGoal?.afternoonCompleted || false));
+	let studyNoteFinished = $derived(isNewDay ? false : (userGoal?.studyNoteCompleted || false));
 
 	// Helper to check if setting notification time is passed
 	function isTimePassed(timeStr: string) {
@@ -72,15 +73,18 @@
 	// Check if sessions are unlocked based on custom settings
 	let morningTimeLimit = $derived(userGoal?.morningNotificationTime || '07:00');
 	let afternoonTimeLimit = $derived(userGoal?.afternoonNotificationTime || '12:00');
+	let eveningTimeLimit = $derived(userGoal?.eveningNotificationTime || '17:00');
 
 	let isMorningUnlocked = $derived(isTimePassed(morningTimeLimit));
 	let isAfternoonUnlocked = $derived(isTimePassed(afternoonTimeLimit));
+	let isEveningUnlocked = $derived(isTimePassed(eveningTimeLimit));
 
-	// Calculate current stack count (0, 1, or 2)
+	// Calculate current stack count (0, 1, 2, or 3)
 	let exerciseStackCount = $derived.by(() => {
 		let count = 0;
 		if (isMorningUnlocked && !morningFinished) count++;
 		if (isAfternoonUnlocked && !afternoonFinished) count++;
+		if (isEveningUnlocked && !studyNoteFinished) count++;
 		return count;
 	});
 
@@ -273,15 +277,15 @@
 			</div>
 		</div>
 
-		<!-- 3. DAILY PRACTICE TASK STACK SECTION (New feature) -->
+		<!-- 3. DAILY PRACTICE TASK STACK SECTION (3-column layout) -->
 		<div class="bg-white dark:bg-bg-dark-sub border border-gray-200 dark:border-gray-800 p-8 rounded shadow-md text-left space-y-6">
 			<div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-4 gap-2">
 				<div>
 					<h2 class="text-md font-serif font-bold tracking-widest text-text-light dark:text-text-dark uppercase">
-						毎日の過去問演習（10問 ✕ 2回）
+						毎日の学習タスク（過去問 ✕ 2 ＋ 勉強ノート）
 					</h2>
 					<p class="text-xs font-light text-gray-400 mt-1">
-						朝7:00と昼12:00に配信。解いていない未消化分は当日中のみスタックされます。
+						朝・昼の過去問1問1答に加え、夕方には勉強ノート（5問確認テスト）が配信されます。
 					</p>
 				</div>
 				<div class="flex items-center space-x-2">
@@ -292,12 +296,12 @@
 				</div>
 			</div>
 
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 				<!-- Morning session -->
 				<div class="p-6 border rounded flex flex-col justify-between items-start space-y-4 {morningFinished ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-gray-200 dark:border-gray-800'}">
 					<div class="space-y-1">
 						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">AM {morningTimeLimit} 配信</span>
-						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">朝の過去問演習 ({userGoal?.questionCountPerSession || 10}問)</h4>
+						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">過去問演習1 ({userGoal?.questionCountPerSession || 10}問)</h4>
 						<p class="text-[10px] font-light text-gray-400">一日の学習インデックスを朝一番に構築</p>
 					</div>
 
@@ -326,7 +330,7 @@
 				<div class="p-6 border rounded flex flex-col justify-between items-start space-y-4 {afternoonFinished ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-gray-200 dark:border-gray-800'}">
 					<div class="space-y-1">
 						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">PM {afternoonTimeLimit} 配信</span>
-						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">昼・夕方の過去問演習 ({userGoal?.questionCountPerSession || 10}問)</h4>
+						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">過去問演習2 ({userGoal?.questionCountPerSession || 10}問)</h4>
 						<p class="text-[10px] font-light text-gray-400">午後の空き時間に知識の定着度をテスト</p>
 					</div>
 
@@ -345,6 +349,35 @@
 									class="px-4 py-2 bg-brass hover:bg-brass-dark text-white text-[10px] tracking-widest font-bold rounded transition-all duration-300"
 								>
 									演習を開始する
+								</a>
+							{/if}
+						{/if}
+					</div>
+				</div>
+
+				<!-- Study Note (Evening) session -->
+				<div class="p-6 border rounded flex flex-col justify-between items-start space-y-4 {studyNoteFinished ? 'border-emerald-500/30 bg-emerald-500/[0.02]' : 'border-gray-200 dark:border-gray-800'}">
+					<div class="space-y-1">
+						<span class="text-[9px] tracking-widest uppercase font-bold text-gray-400">PM {eveningTimeLimit} 配信</span>
+						<h4 class="font-serif font-bold text-sm text-text-light dark:text-text-dark">勉強ノート (四択5問)</h4>
+						<p class="text-[10px] font-light text-gray-400">夕方の個別課題指示と確認テスト</p>
+					</div>
+
+					<div class="w-full flex items-center justify-between pt-2">
+						{#if !isEveningUnlocked}
+							<span class="text-xs font-light text-gray-400">
+								🔒 {eveningTimeLimit}に解放されます
+							</span>
+						{:else}
+							<span class="text-xs font-light {studyNoteFinished ? 'text-emerald-500 font-bold' : 'text-gray-400'}">
+								{studyNoteFinished ? '✓ 完了' : '未完了'}
+							</span>
+							{#if !studyNoteFinished}
+								<a
+									href="/study-note"
+									class="px-4 py-2 bg-brass hover:bg-brass-dark text-white text-[10px] tracking-widest font-bold rounded transition-all duration-300"
+								>
+									ノートを開く
 								</a>
 							{/if}
 						{/if}

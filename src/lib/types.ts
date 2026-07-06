@@ -19,7 +19,9 @@ export interface UserGoal {
 	afternoonCompleted?: boolean;
 	morningNotificationTime?: string;
 	afternoonNotificationTime?: string;
+	eveningNotificationTime?: string;
 	questionCountPerSession?: number;
+	studyNoteCompleted?: boolean;
 }
 
 export interface TagStats {
@@ -86,4 +88,15 @@ export interface DailyColumn {
 	content: string;
 	imageUrl?: string;
 	relatedTags: string[];
+}
+
+export interface FourChoiceQuestion {
+	questionId: string;
+	subject: string;
+	chapter: string;
+	questionText: string;
+	choices: string[];
+	correctAnswer: number;
+	explanation: string;
+	aiVectors?: QuestionAiVectors;
 }
