@@ -18,11 +18,12 @@
 		user = val as any;
 	});
 
-	onMount(async () => {
+	onMount(() => {
 		// 1. PWA Service Worker Registration
 		if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-			const { registerSW } = await import('virtual:pwa-register');
-			registerSW({ immediate: true });
+			import('virtual:pwa-register').then(({ registerSW }) => {
+				registerSW({ immediate: true });
+			});
 		}
 
 		// 2. Dark Mode check from localStorage or preference
@@ -84,7 +85,7 @@
 					loading: false
 				});
 				// If not on public top page, redirect to home
-				if (page.url.pathname !== '/' && page.url.pathname !== '') {
+				if (page.url.pathname !== '/') {
 					goto('/');
 				}
 			}
