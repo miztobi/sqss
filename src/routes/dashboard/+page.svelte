@@ -333,7 +333,7 @@
 				今日の学習コラム（AI編纂）
 			</h2>
 
-			<div class="max-w-md">
+			<div class="w-full max-w-2xl">
 				{#if todayColumn}
 					<DailyColumnCard column={todayColumn} />
 				{:else}
