@@ -1,5 +1,19 @@
 <script lang="ts">
-	let { show = $bindable(false), title, onclose, children, footer } = $props();
+	import type { Snippet } from 'svelte';
+
+	let {
+		show = $bindable(false),
+		title,
+		onclose = undefined,
+		children,
+		footer = undefined
+	}: {
+		show: boolean;
+		title: string;
+		onclose?: () => void;
+		children?: Snippet;
+		footer?: Snippet;
+	} = $props();
 
 	function close() {
 		show = false;

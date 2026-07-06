@@ -14,9 +14,21 @@
 		userAnswer = null,
 		initialNote = '',
 		onSave
+	}: {
+		userId: string | null;
+		questionId: string;
+		index: number;
+		subject: string;
+		chapter: string;
+		questionText: string;
+		correctAnswer: 'O' | 'X';
+		explanation: string;
+		userAnswer?: 'O' | 'X' | null;
+		initialNote?: string;
+		onSave?: (id: string, text: string) => void;
 	} = $props();
 
-	let noteText = $state(initialNote);
+	let noteText = $state('');
 	let noteStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
 	// Keep local note updated if initialNote updates (e.g. async fetch)

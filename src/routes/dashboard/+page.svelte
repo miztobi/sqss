@@ -357,7 +357,7 @@
 								correctAnswer={log.correctAnswer}
 								explanation={log.explanation}
 								initialNote={editingNotes[log.questionId]}
-								onSave={(id, text) => {
+								onSave={(id: string, text: string) => {
 									editingNotes[id] = text;
 								}}
 							/>

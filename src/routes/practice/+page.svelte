@@ -254,7 +254,7 @@
 									explanation={q.explanation}
 									userAnswer={answers[q.questionId]}
 									initialNote={notes[q.questionId] || ''}
-									onSave={(id, text) => {
+									onSave={(id: string, text: string) => {
 										notes[id] = text;
 									}}
 								/>
