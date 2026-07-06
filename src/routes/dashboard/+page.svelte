@@ -22,6 +22,14 @@
 	let tagMatrixList = $state<TagMatrix[]>([]);
 	let dailyColumns = $state<DailyColumn[]>([]);
 
+	// Pick one column daily
+	let todayColumn = $derived.by(() => {
+		if (dailyColumns.length === 0) return null;
+		const day = new Date().getDate();
+		const index = day % dailyColumns.length;
+		return dailyColumns[index];
+	});
+
 	let loadingData = $state(true);
 	let billingRedirecting = $state(false);
 
@@ -325,10 +333,12 @@
 				今日の学習コラム（AI編纂）
 			</h2>
 
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-				{#each dailyColumns as column}
-					<DailyColumnCard {column} />
-				{/each}
+			<div class="max-w-md">
+				{#if todayColumn}
+					<DailyColumnCard column={todayColumn} />
+				{:else}
+					<p class="text-xs font-light text-gray-400">今日のコラムはありません。</p>
+				{/if}
 			</div>
 		</div>
 
