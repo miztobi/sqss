@@ -36,10 +36,11 @@
 					doc(db, `users/${user.uid}/user_goals/1kyu_kenchikushi`)
 				);
 				if (userGoalSnap.exists()) {
-					userGoal = userGoalSnap.data() as any;
-					if (!userGoal.targetYear) {
-						userGoal.targetYear = 2026; // Default goal target
+					const data = userGoalSnap.data() as any;
+					if (!data.targetYear) {
+						data.targetYear = 2026; // Default goal target
 					}
+					userGoal = data;
 				}
 
 				// Load tag matrix for catching up on mastery
@@ -121,7 +122,7 @@
 		<div class="flex-grow flex items-center justify-center min-h-[40vh]">
 			<div class="w-8 h-8 border-2 border-brass border-t-transparent rounded-full animate-spin"></div>
 		</div>
-	{:else}
+	{:else if userGoal}
 		<div class="space-y-2 text-center">
 			<span class="text-[10px] tracking-[0.3em] text-brass font-serif uppercase"
 				>Learning Roadmap & Roadmap</span
